@@ -23,12 +23,9 @@ test_images_opt_folder = 'data/test_images_opt/'
 test_images_rgb_folder = 'data/test_images_rgb/'
 
 BATCH_SIZE = 32
-EPOCHS = 1
-
 debug = False
 
-if not debug:
-    EPOCHS = 100
+EPOCHS = 1 if debug else 100
 
 # i wanted to the files arranged numerically, which os.listdir doesn't inherently do.
 def sort_files_numerically(path_to_files):
@@ -54,16 +51,16 @@ def get_dense_opt_flow(first, second):
     mag, ang = cv2.cartToPolar(flow[...,0], flow[...,1])
     hsv[...,0] = ang*180/np.pi/2
     hsv[...,2] = cv2.normalize(mag, None, 0, 255, cv2.NORM_MINMAX)
-    bgr = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
-    return bgr
+    return cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
 
 # load up the video and actually save the frames/optical flow output locally for faster training/testing.
 def load_video(training=True):
     video = None
-    if not training:
-        video = cv2.VideoCapture('data/test.mp4')
-    else:
-        video = cv2.VideoCapture('data/train.mp4')
+    video = (
+        cv2.VideoCapture('data/train.mp4')
+        if training
+        else cv2.VideoCapture('data/test.mp4')
+    )
 
     success, first = video.read()
 
@@ -116,7 +113,7 @@ def get_data(training):
     speeds = []
 
     count = 0
-    for i in range(0, len(image_file_names) - 1):
+    for i in range(len(image_file_names) - 1):
         file_name = image_file_names[i]
         sys.stdout.write("\rProcessing %s" % file_name)
 
@@ -169,18 +166,26 @@ def test_and_visualize(training):
         predicted_speed = model.predict(np.expand_dims(image_for_model, axis=0))[0][0]
 
 
-        cv2.putText(full_rgb, "Actual: " + str(round(speed, 2)),
-            (10,30),
+        cv2.putText(
+            full_rgb,
+            f"Actual: {str(round(speed, 2))}",
+            (10, 30),
             font,
             fontScale,
             fontColor,
-            lineType)
-        cv2.putText(full_rgb, "Predicted: " + str(round(predicted_speed,2)),
-            (10,60),
+            lineType,
+        )
+
+        cv2.putText(
+            full_rgb,
+            f"Predicted: {str(round(predicted_speed,2))}",
+            (10, 60),
             font,
             fontScale,
             fontColor,
-            lineType)
+            lineType,
+        )
+
         cv2.putText(full_rgb, "Error: " + str(round(abs(predicted_speed - speed), 2)),
             (10,90),
             font,
@@ -206,14 +211,12 @@ def evaluate_model(training):
 def get_test_txt(training):
     X, y = get_data(training)
     print("Loading/ Evaluating model... ")
-    text_file = open("test.txt", "w")
-    model = load_model('model.h5')
+    with open("test.txt", "w") as text_file:
+        model = load_model('model.h5')
 
-    for image_for_model, speed in zip(X,y):
-        pred = model.predict(np.expand_dims(image_for_model, axis=0))[0][0]
-        text_file.write("%s\n" % pred)
-
-    text_file.close()
+        for image_for_model, speed in zip(X,y):
+            pred = model.predict(np.expand_dims(image_for_model, axis=0))[0][0]
+            text_file.write("%s\n" % pred)
 
 
 if __name__ == '__main__':
@@ -225,11 +228,10 @@ if __name__ == '__main__':
             os.mkdir(train_images_opt_folder)
             os.mkdir(train_images_rgb_folder)
             load_video(use_training_data)
-    else:
-        if not os.path.isdir(test_images_opt_folder) and not os.path.isdir(test_images_rgb_folder):
-            os.mkdir(test_images_opt_folder)
-            os.mkdir(test_images_rgb_folder)
-            load_video(use_training_data)
+    elif not os.path.isdir(test_images_opt_folder) and not os.path.isdir(test_images_rgb_folder):
+        os.mkdir(test_images_opt_folder)
+        os.mkdir(test_images_rgb_folder)
+        load_video(use_training_data)
 
     # get_test_txt(False)
     # sys.exit()
